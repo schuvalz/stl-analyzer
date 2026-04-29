@@ -12,8 +12,11 @@ def analyze_stl():
     file = request.files['file']
 
     try:
-        # 파일을 읽어 3D 형상(trimesh)으로 변환
-        mesh = trimesh.load(file, file_type='stl')
+        # Make.com이 던진 파일을 안전하게 읽어들이는 방식으로 변경
+        file_bytes = io.BytesIO(file.read())
+        
+        # load 대신 더 확실한 최신 명령어인 load_mesh 사용
+        mesh = trimesh.load_mesh(file_bytes, file_type='stl')
 
         # 5가지 값 계산
         bounds = mesh.extents  # [X, Y, Z]
