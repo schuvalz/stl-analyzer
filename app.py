@@ -12,18 +12,24 @@ def analyze_stl():
     file = request.files['file']
 
     try:
-        # Make.com이 던진 파일을 안전하게 읽어들이는 방식으로 변경
+        # 1. 파일 데이터를 메모리에 읽어들임
         file_bytes = io.BytesIO(file.read())
         
-        # load 대신 더 확실한 최신 명령어인 load_mesh 사용
-        mesh = trimesh.load_mesh(file_bytes, file_type='stl')
+        # 2. trimesh.load 를 사용하되, 명확하게 stl 파일임을 지정
+        # (load_mesh가 아니라 load가 맞습니다. 제 실수입니다.)
+        mesh = trimesh.load(file_bytes, file_type='stl')
 
-        # 5가지 값 계산
-        bounds = mesh.extents  # [X, Y, Z]
-        volume = mesh.volume   # 부피
-        area = mesh.area       # 표면적
+        # 3. 5가지 값 계산
+        # STL 파일이 여러 개의 파트로 나뉘어 있을 수 있으므로 통합된 geometry를 사용
+        if isinstance(mesh, trimesh.Scene):
+            geometry = mesh.dump(concatenate=True)
+        else:
+            geometry = mesh
 
-        # 결과를 JSON 형태로 반환
+        bounds = geometry.extents  # [X, Y, Z]
+        volume = geometry.volume   # 부피
+        area = geometry.area       # 표면적
+
         return jsonify({
             "x": round(float(bounds[0]), 2),
             "y": round(float(bounds[1]), 2),
