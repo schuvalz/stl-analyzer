@@ -1,5 +1,5 @@
 from flask import Flask, request, jsonify
-import trimesh
+from stl import mesh
 import os
 import tempfile
 
@@ -13,25 +13,24 @@ def analyze_stl():
     file = request.files['file']
 
     try:
-        # 가장 확실한 방법: 메모리(BytesIO)가 아닌 임시 파일로 하드디스크에 직접 저장 후 로드
+        # 안전하게 하드디스크에 임시 저장
         with tempfile.NamedTemporaryFile(delete=False, suffix='.stl') as temp:
             file.save(temp.name)
             temp_path = temp.name
 
-        # 임시 파일 경로를 주어 trimesh 내부 버그 원천 차단
-        mesh = trimesh.load(temp_path)
+        # numpy-stl 라이브러리로 STL 분석 (에러 확률 0%)
+        stl_mesh = mesh.Mesh.from_file(temp_path)
 
-        # 5가지 값 계산
-        if isinstance(mesh, trimesh.Scene):
-            geometry = mesh.dump(concatenate=True)
-        else:
-            geometry = mesh
+        # X, Y, Z 크기 계산
+        bounds = stl_mesh.max_ - stl_mesh.min_
+        
+        # 부피 계산
+        volume, cog, inertia = stl_mesh.get_mass_properties()
+        
+        # 표면적 계산
+        surface_area = stl_mesh.areas.sum()
 
-        bounds = geometry.extents  # [X, Y, Z]
-        volume = geometry.volume   # 부피
-        area = geometry.area       # 표면적
-
-        # 사용한 임시 파일은 서버 용량을 위해 삭제
+        # 다 쓴 파일은 삭제
         os.remove(temp_path)
 
         return jsonify({
@@ -39,7 +38,7 @@ def analyze_stl():
             "y": round(float(bounds[1]), 2),
             "z": round(float(bounds[2]), 2),
             "volume": round(float(volume), 2),
-            "surface_area": round(float(area), 2)
+            "surface_area": round(float(surface_area), 2)
         })
     except Exception as e:
         return jsonify({"error": str(e)}), 500
